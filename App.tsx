@@ -746,38 +746,39 @@ const App: React.FC = () => {
                 {activeTaskForVariants ? (
                    <div className="animate-in slide-in-from-right fade-in">
                      <p className="text-white font-bold mb-2">{t.selectVariant}: {activeTaskForVariants.title}</p>
-                     <div className="flex flex-wrap gap-2">
+                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                        {activeTaskForVariants.variants?.map(variant => (
                          <button
                            key={variant.id}
                            onClick={() => handleVariantClick(variant)}
-                           className="px-4 py-3 bg-blue-600/30 hover:bg-blue-500/50 border border-blue-400/30 rounded-lg text-sm transition-all flex flex-col items-center min-w-[100px]"
+                           className="p-3 bg-blue-600/30 hover:bg-blue-500/50 border border-blue-400/30 rounded-lg text-sm transition-all flex flex-col items-center justify-center active:scale-95"
                          >
-                           <span className="font-bold">{variant.label}</span>
+                           <span className="font-bold text-center">{variant.label}</span>
                            <span className="text-xs opacity-90">{variant.price.toFixed(2)} {invoice.currency}</span>
                          </button>
                        ))}
                      </div>
                    </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2 animate-in slide-in-from-left fade-in max-h-60 overflow-y-auto custom-scrollbar">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 animate-in slide-in-from-left fade-in max-h-[60vh] overflow-y-auto custom-scrollbar pb-2">
                     {savedTasks.map(task => (
                       <button
                         key={task.id}
                         onClick={() => handleTaskClick(task)}
                         className={`
-                          px-3 py-2 
+                          p-3
                           bg-slate-700/50 hover:bg-blue-600/50 
                           border border-slate-600 
                           rounded-lg 
                           text-sm transition-all text-left 
-                          flex flex-col gap-1 min-w-[100px]
+                          flex flex-col gap-1 w-full
+                          active:scale-95
                           ${task.variants?.length ? 'border-l-4 border-l-purple-500' : ''}
                         `}
                       >
                         <div className="flex justify-between items-start w-full">
-                          <span className="font-semibold">{task.title}</span>
-                          {task.variants && task.variants.length > 0 && <Layers size={12} className="text-purple-300" />}
+                          <span className="font-semibold truncate w-full">{task.title}</span>
+                          {task.variants && task.variants.length > 0 && <Layers size={12} className="text-purple-300 shrink-0 ml-1" />}
                         </div>
                         {!task.variants?.length && (
                           <span className="text-xs opacity-70">{task.price.toFixed(2)} {invoice.currency}</span>
@@ -909,20 +910,31 @@ const App: React.FC = () => {
   );
 
   const renderTasksTab = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold flex items-center gap-2"><CheckCircle /> {t.tasks}</h2>
-        <div className="flex gap-2">
-          <GlassButton onClick={loadStandardTasksToState} variant="secondary">
-            <RefreshCw size={16} /> {t.loadStandard}
-          </GlassButton>
-          <GlassButton onClick={() => setEditingTask({ id: Date.now().toString(), title: '', description: '', price: 0 })}>
-            <Plus size={16} /> {t.addTask}
-          </GlassButton>
-        </div>
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+      {/* Header Title */}
+      <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
+        <CheckCircle /> {t.tasks}
+      </h2>
+
+      {/* Action Buttons Row */}
+      <div className="grid grid-cols-2 gap-3 w-full">
+        <GlassButton 
+          onClick={loadStandardTasksToState} 
+          variant="secondary"
+          className="w-full justify-center py-3 text-base font-semibold"
+        >
+          <RefreshCw size={18} /> {t.loadStandard}
+        </GlassButton>
+        <GlassButton 
+          onClick={() => setEditingTask({ id: Date.now().toString(), title: '', description: '', price: 0 })}
+          className="w-full justify-center py-3 text-base font-semibold"
+        >
+          <Plus size={18} /> {t.addTask}
+        </GlassButton>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
         {savedTasks.map(task => (
           <GlassCard key={task.id} className="p-4 relative group hover:border-purple-500/50 transition-colors">
              <div className="flex justify-between items-start mb-2">
