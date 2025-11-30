@@ -4,11 +4,59 @@ import {
   Plus, Trash2, Printer, Sparkles, Receipt, Command, 
   Users, Settings, History, Save, X, Eye, Share2, 
   Briefcase, CheckCircle, FileText, Download, ArrowLeft, Layers, Edit, RefreshCw,
-  ChevronDown
+  ChevronDown, AlertTriangle
 } from 'lucide-react';
 import { GlassCard, GlassInput, GlassButton } from './components/GlassCard';
 import { InvoiceData, InvoiceItem, Client, CompanyProfile, SavedTask, InvoiceStatus, TaskVariant } from './types';
 import { geminiService } from './services/geminiService';
+
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("App Crash:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#1a1a1a] flex flex-col items-center justify-center p-4 text-center">
+          <div className="bg-red-900/20 border border-red-500/50 p-8 rounded-2xl max-w-md backdrop-blur-xl">
+            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-white mb-2">Etwas ist schief gelaufen</h1>
+            <p className="text-slate-300 mb-6">
+              Die App konnte aufgrund veralteter Daten nicht geladen werden. Bitte setzen Sie die Daten zurück.
+              <br/><br/>
+              The app crashed due to incompatible local data. Please reset.
+            </p>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-lg w-full transition-colors flex items-center justify-center gap-2"
+            >
+              <Trash2 size={18} />
+              Daten zurücksetzen (Reset Data)
+            </button>
+            <p className="mt-4 text-xs text-slate-500 font-mono break-all">
+              {this.state.error?.toString()}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- Translations ---
 const TRANSLATIONS = {
@@ -312,7 +360,7 @@ const INITIAL_INVOICE_STATE: InvoiceData = {
   status: 'draft'
 };
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   // --- State ---
   const [lang, setLang] = useState<'de' | 'ar'>('de');
   const t = TRANSLATIONS[lang];
@@ -341,36 +389,66 @@ const App: React.FC = () => {
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Load from LocalStorage
+  // Load from LocalStorage with Safety Checks
   useEffect(() => {
-    const savedProfile = localStorage.getItem('zujaj_profile');
-    if (savedProfile) setCompanyProfile(JSON.parse(savedProfile));
-
-    const savedClients = localStorage.getItem('zujaj_clients');
-    if (savedClients) setClients(JSON.parse(savedClients));
-
-    const savedTasksData = localStorage.getItem('zujaj_tasks');
-    if (savedTasksData) {
-      setSavedTasks(JSON.parse(savedTasksData));
-    } else {
-      // Auto-load defaults if empty
-      const defaults = generateStandardTasks();
-      setSavedTasks(defaults);
-      localStorage.setItem('zujaj_tasks', JSON.stringify(defaults));
+    try {
+      const savedProfile = localStorage.getItem('zujaj_profile');
+      if (savedProfile) {
+        setCompanyProfile(JSON.parse(savedProfile));
+        setInvoice(prev => ({ ...prev, sender: JSON.parse(savedProfile) }));
+      }
+    } catch (e) {
+      console.error("Error loading profile", e);
     }
 
-    const savedHistory = localStorage.getItem('zujaj_history');
-    if (savedHistory) setInvoiceHistory(JSON.parse(savedHistory));
-    
-    if (savedProfile) {
-      setInvoice(prev => ({ ...prev, sender: JSON.parse(savedProfile) }));
+    try {
+      const savedClients = localStorage.getItem('zujaj_clients');
+      if (savedClients) setClients(JSON.parse(savedClients));
+    } catch (e) {
+      console.error("Error loading clients", e);
+    }
+
+    try {
+      const savedTasksData = localStorage.getItem('zujaj_tasks');
+      if (savedTasksData) {
+        const parsed = JSON.parse(savedTasksData) as SavedTask[];
+        // Validate / Clean data to prevent crashes
+        const cleanTasks = parsed.map(task => ({
+          ...task,
+          price: typeof task.price === 'number' ? task.price : 0,
+          variants: Array.isArray(task.variants) ? task.variants.map(v => ({
+            ...v,
+            price: typeof v.price === 'number' ? v.price : 0
+          })) : []
+        }));
+        setSavedTasks(cleanTasks);
+      } else {
+        // Auto-load defaults if empty
+        const defaults = generateStandardTasks();
+        setSavedTasks(defaults);
+        localStorage.setItem('zujaj_tasks', JSON.stringify(defaults));
+      }
+    } catch (e) {
+      console.error("Error loading tasks", e);
+      // Fallback to default
+      setSavedTasks(generateStandardTasks());
+    }
+
+    try {
+      const savedHistory = localStorage.getItem('zujaj_history');
+      if (savedHistory) setInvoiceHistory(JSON.parse(savedHistory));
+    } catch (e) {
+      console.error("Error loading history", e);
     }
 
     // PWA Install Event Listener
-    window.addEventListener('beforeinstallprompt', (e) => {
+    const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-    });
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   // Save to LocalStorage helpers
@@ -441,12 +519,19 @@ const App: React.FC = () => {
 
   const handleSaveTask = () => {
     if (!editingTask) return;
-    const exists = savedTasks.find(t => t.id === editingTask.id);
+    // Ensure price is valid
+    const cleanTask = {
+       ...editingTask,
+       price: editingTask.price || 0,
+       variants: editingTask.variants?.map(v => ({...v, price: v.price || 0})) || []
+    };
+    
+    const exists = savedTasks.find(t => t.id === cleanTask.id);
     let newList;
     if (exists) {
-      newList = savedTasks.map(t => t.id === editingTask.id ? editingTask : t);
+      newList = savedTasks.map(t => t.id === cleanTask.id ? cleanTask : t);
     } else {
-      newList = [...savedTasks, editingTask];
+      newList = [...savedTasks, cleanTask];
     }
     saveTaskList(newList);
     setEditingTask(null);
@@ -501,7 +586,7 @@ const App: React.FC = () => {
           id: Date.now().toString(), 
           description: task.description || task.title, 
           quantity: 1, 
-          price: task.price 
+          price: task.price || 0 
         }]
       }));
     }
@@ -515,7 +600,7 @@ const App: React.FC = () => {
         id: Date.now().toString(), 
         description: `${activeTaskForVariants.title} - ${variant.label}`, 
         quantity: 1, 
-        price: variant.price 
+        price: variant.price || 0 
       }]
     }));
   };
@@ -566,7 +651,7 @@ const App: React.FC = () => {
     }
   };
 
-  const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+  const subtotal = invoice.items.reduce((sum, item) => sum + (item.quantity * (item.price || 0)), 0);
   const taxAmount = (subtotal * invoice.taxRate) / 100;
   const total = subtotal + taxAmount;
 
@@ -623,8 +708,8 @@ const App: React.FC = () => {
                 <p className="font-medium text-black">{item.description}</p>
               </td>
               <td className="py-3 text-center">{item.quantity}</td>
-              <td className="py-3 text-right">{item.price.toFixed(2)}</td>
-              <td className="py-3 text-right font-bold">{(item.quantity * item.price).toFixed(2)}</td>
+              <td className="py-3 text-right">{(item.price || 0).toFixed(2)}</td>
+              <td className="py-3 text-right font-bold">{(item.quantity * (item.price || 0)).toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
@@ -755,7 +840,7 @@ const App: React.FC = () => {
                            className="p-3 bg-blue-600/30 hover:bg-blue-500/50 border border-blue-400/30 rounded-lg text-sm transition-all flex flex-col items-center justify-center active:scale-95"
                          >
                            <span className="font-bold text-center">{variant.label}</span>
-                           <span className="text-xs opacity-90">{variant.price.toFixed(2)} {invoice.currency}</span>
+                           <span className="text-xs opacity-90">{(variant.price || 0).toFixed(2)} {invoice.currency}</span>
                          </button>
                        ))}
                      </div>
@@ -782,7 +867,7 @@ const App: React.FC = () => {
                           {task.variants && task.variants.length > 0 && <Layers size={12} className="text-purple-300 shrink-0 ml-1" />}
                         </div>
                         {!task.variants?.length && (
-                          <span className="text-xs opacity-70">{task.price.toFixed(2)} {invoice.currency}</span>
+                          <span className="text-xs opacity-70">{(task.price || 0).toFixed(2)} {invoice.currency}</span>
                         )}
                       </button>
                     ))}
@@ -950,7 +1035,7 @@ const App: React.FC = () => {
                  {task.variants?.length ? `${task.variants.length} Varianten` : 'Festpreis'}
                </span>
                <span className="font-bold text-green-400">
-                 {!task.variants?.length ? `${task.price.toFixed(2)} €` : ''}
+                 {!task.variants?.length ? `${(task.price || 0).toFixed(2)} €` : ''}
                </span>
              </div>
           </GlassCard>
@@ -1015,7 +1100,7 @@ const App: React.FC = () => {
                   {inv.status}
                 </span>
                 <span className="font-bold text-blue-300">
-                  {inv.items.reduce((s, i) => s + (i.price * i.quantity), 0).toFixed(2)} {inv.currency}
+                  {inv.items.reduce((s, i) => s + ((i.price || 0) * i.quantity), 0).toFixed(2)} {inv.currency}
                 </span>
                 <div className="flex gap-2">
                   <GlassButton 
@@ -1304,5 +1389,13 @@ const NavButton = ({ active, onClick, icon, label }: any) => (
     <span className="hidden lg:block">{label}</span>
   </button>
 );
+
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
 
 export default App;
