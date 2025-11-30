@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Trash2, Printer, Sparkles, Receipt, Command, 
   Users, Settings, History, Save, X, Eye, Share2, 
-  Briefcase, CheckCircle, FileText, Download, ArrowLeft, Layers, Edit3, RefreshCw,
+  Briefcase, CheckCircle, FileText, Download, ArrowLeft, Layers, Edit, RefreshCw,
   ChevronDown
 } from 'lucide-react';
 import { GlassCard, GlassInput, GlassButton } from './components/GlassCard';
@@ -897,7 +898,7 @@ const App: React.FC = () => {
               <h3 className="font-bold text-lg text-white">{client.name}</h3>
               <div className="flex gap-2">
                  <button onClick={() => setEditingClient(client)} className="text-blue-400 hover:text-blue-300 p-1 bg-blue-500/10 rounded">
-                   <Edit3 size={14} />
+                   <Edit size={14} />
                  </button>
               </div>
             </div>
@@ -910,27 +911,27 @@ const App: React.FC = () => {
   );
 
   const renderTasksTab = () => (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-      {/* Header Title */}
-      <h2 className="text-2xl font-bold flex items-center gap-2 mb-2">
-        <CheckCircle /> {t.tasks}
-      </h2>
-
-      {/* Action Buttons Row */}
-      <div className="grid grid-cols-2 gap-3 w-full">
-        <GlassButton 
-          onClick={loadStandardTasksToState} 
-          variant="secondary"
-          className="w-full justify-center py-3 text-base font-semibold"
-        >
-          <RefreshCw size={18} /> {t.loadStandard}
-        </GlassButton>
-        <GlassButton 
-          onClick={() => setEditingTask({ id: Date.now().toString(), title: '', description: '', price: 0 })}
-          className="w-full justify-center py-3 text-base font-semibold"
-        >
-          <Plus size={18} /> {t.addTask}
-        </GlassButton>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+      {/* Header with Title and Actions aligned cleanly */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <CheckCircle /> {t.tasks}
+        </h2>
+        <div className="flex gap-3 w-full md:w-auto">
+          <GlassButton 
+            onClick={loadStandardTasksToState} 
+            variant="secondary"
+            className="flex-1 md:flex-none justify-center"
+          >
+            <RefreshCw size={18} /> {t.loadStandard}
+          </GlassButton>
+          <GlassButton 
+            onClick={() => setEditingTask({ id: Date.now().toString(), title: '', description: '', price: 0 })}
+            className="flex-1 md:flex-none justify-center"
+          >
+            <Plus size={18} /> {t.addTask}
+          </GlassButton>
+        </div>
       </div>
       
       {/* Cards Grid */}
@@ -940,7 +941,7 @@ const App: React.FC = () => {
              <div className="flex justify-between items-start mb-2">
                <h3 className="font-bold text-lg">{task.title}</h3>
                <button onClick={() => setEditingTask(task)} className="text-blue-400 hover:text-blue-300 p-1 bg-blue-500/10 rounded">
-                 <Edit3 size={14} />
+                 <Edit size={14} />
                </button>
              </div>
              <p className="text-sm text-slate-400 line-clamp-2 min-h-[40px]">{task.description}</p>
@@ -1022,7 +1023,7 @@ const App: React.FC = () => {
                     className="text-xs"
                     variant="secondary"
                   >
-                    <Edit3 size={14} />
+                    <Edit size={14} />
                   </GlassButton>
                   <GlassButton 
                     onClick={() => deleteFromHistory(inv.id)}
